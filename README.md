@@ -42,4 +42,4 @@ That's literally it!
 
 ## Installation
 
-Just add the file to your project and adjust it's namespace. You don't need to do anything else! Plug and play!
+Just add the file to your project and adjust it's namespace. You don't need to do anything else (Well, you will also need to enable unsafe code because Marshal). Plug and play!
