@@ -40,10 +40,16 @@ namespace Hypervisor
         /// </summary>
         /// <typeparam name="T">Type of the value to read.</typeparam>
         /// <param name="Address">The address of the value to read.</param>
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
         /// <returns>The value as it is read from memory.</returns>
-        public static T Read<T>(ulong Address) where T : struct
+        public static T Read<T>(ulong Address, bool Absolute = false) where T : struct
         {
-            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), new Type[] { });
+            var _address = (IntPtr)Address;
+
+            if (Absolute)
+                _address = (IntPtr)(PureAddress + Address);
+
+            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), []);
             ILGenerator _ilGen = _dynoMethod.GetILGenerator();
 
             _ilGen.Emit(OpCodes.Sizeof, typeof(T));
@@ -54,7 +60,7 @@ namespace Hypervisor
             var _outArray = new byte[_outSize];
             int _outRead = 0;
 
-            ReadProcessMemory(Handle, (IntPtr)(PureAddress + Address), _outArray, _outSize, ref _outRead);
+            ReadProcessMemory(Handle, _address, _outArray, _outSize, ref _outRead);
 
             var _gcHandle = GCHandle.Alloc(_outArray, GCHandleType.Pinned);
             var _retData = (T)Marshal.PtrToStructure(_gcHandle.AddrOfPinnedObject(), typeof(T));
@@ -71,10 +77,16 @@ namespace Hypervisor
         /// <typeparam name="T">Type of the array to read.</typeparam>
         /// <param name="Address">The address of the value to read.</param>
         /// <param name="Size">The size of the array to read.</param>
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
         /// <returns>The array as it is read from memory.</returns>
-        public static T[] Read<T>(ulong Address, int Size) where T : struct
+        public static T[] Read<T>(ulong Address, int Size, bool Absolute = false) where T : struct
         {
-            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), new Type[] { });
+            var _address = (IntPtr)Address;
+
+            if (Absolute)
+                _address = (IntPtr)(PureAddress + Address);
+
+            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), []);
             ILGenerator _ilGen = _dynoMethod.GetILGenerator();
 
             _ilGen.Emit(OpCodes.Sizeof, typeof(T));
@@ -85,14 +97,14 @@ namespace Hypervisor
             var _outArray = new byte[Size * _outSize];
             int _outRead = 0;
 
-            ReadProcessMemory(Handle, (IntPtr)(PureAddress + Address), _outArray, Size * _outSize, ref _outRead);
+            ReadProcessMemory(Handle, _address, _outArray, Size * _outSize, ref _outRead);
 
             var _retArray = new T[Size];
 
             for (int i = 0; i < Size; i++)
             {
                 var _pickArray = _outArray.Skip(i * _outSize).Take(_outSize).ToArray();
-                
+
                 var _gcHandle = GCHandle.Alloc(_pickArray, GCHandleType.Pinned);
                 var _convData = (T)Marshal.PtrToStructure(_gcHandle.AddrOfPinnedObject(), typeof(T));
 
@@ -110,9 +122,15 @@ namespace Hypervisor
         /// <typeparam name="T">Type of the value to write. Must have a size.</typeparam>
         /// <param name="Address">The address which the value will be written to.</param>
         /// <param name="Value">The value to write.</param>
-        public static void Write<T>(ulong Address, T Value) where T : struct
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
+        public static void Write<T>(ulong Address, T Value, bool Absolute = false) where T : struct
         {
-            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), new Type[] { });
+            var _address = (IntPtr)Address;
+
+            if (Absolute)
+                _address = (IntPtr)(PureAddress + Address);
+
+            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), []);
             ILGenerator _ilGen = _dynoMethod.GetILGenerator();
 
             _ilGen.Emit(OpCodes.Sizeof, typeof(T));
@@ -124,13 +142,13 @@ namespace Hypervisor
             if (_inSize > 1)
             {
                 var _inArray = (byte[])typeof(BitConverter).GetMethod("GetBytes", new[] { typeof(T) }).Invoke(null, new object[] { Value });
-                WriteProcessMemory(Handle, (IntPtr)Address, _inArray, _inArray.Length, ref _inWrite);
+                WriteProcessMemory(Handle, _address, _inArray, _inArray.Length, ref _inWrite);
             }
 
             else
             {
                 var _inArray = new byte[] { (byte)Convert.ChangeType(Value, typeof(byte)) };
-                WriteProcessMemory(Handle, (IntPtr)Address, _inArray, _inArray.Length, ref _inWrite);
+                WriteProcessMemory(Handle, _address, _inArray, _inArray.Length, ref _inWrite);
             }
         }
 
@@ -141,9 +159,15 @@ namespace Hypervisor
         /// <typeparam name="T">Type of the array to write. Must have a size.</typeparam>
         /// <param name="Address">The address which the Array will be written to.</param>
         /// <param name="Value">The array to write.</param>
-        public static void Write<T>(ulong Address, T[] Value) where T : struct
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
+        public static void Write<T>(ulong Address, T[] Value, bool Absolute = false) where T : struct
         {
-            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), new Type[] { });
+            var _address = (IntPtr)Address;
+
+            if (Absolute)
+                _address = (IntPtr)(PureAddress + Address);
+
+            var _dynoMethod = new DynamicMethod("SizeOfType", typeof(int), []);
             ILGenerator _ilGen = _dynoMethod.GetILGenerator();
 
             _ilGen.Emit(OpCodes.Sizeof, typeof(T));
@@ -157,36 +181,54 @@ namespace Hypervisor
                 for (int i = 0; i < Value.Length; i++)
                 {
                     var _inArray = (byte[])typeof(BitConverter).GetMethod("GetBytes", [typeof(T)]).Invoke(null, [Value[i]]);
-                    WriteProcessMemory(Handle, (IntPtr)(PureAddress + Address) + _inSize * i, _inArray, _inArray.Length, ref _inWrite);
+                    WriteProcessMemory(Handle, _address + _inSize * i, _inArray, _inArray.Length, ref _inWrite);
                 }
             }
 
             else
-                WriteProcessMemory(Handle, (IntPtr)(PureAddress + Address), Value as byte[], Value.Length, ref _inWrite);
+                WriteProcessMemory(Handle, _address, Value as byte[], Value.Length, ref _inWrite);
+        }
+
+        /// <summary>
+        /// Calculated a pointer with the given offsets.
+        /// All offsets are added and the resulting address is read.
+        /// </summary>
+        /// <param name="Address">The starting point to the pointer.</param>
+        /// <param name="Offsets">All the offsets of the pointer, null by default.</param>
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
+        /// <returns>The final calculated pointer.</returns>
+        public static ulong GetPointer(ulong Address, uint[] Offsets = null, bool Absolute = false)
+        {
+            var _address = (IntPtr)Address;
+
+            if (Absolute)
+                _address = (IntPtr)(PureAddress + Address);
+
+            var _returnPoint = Read<ulong>(Address, Absolute);
+
+            if (Offsets == null)
+                return _returnPoint;
+
+            for (int i = 0; i < Offsets.Length; i++)
+                _returnPoint = Read<ulong>(_returnPoint + Offsets[i], true);
+
+            return _returnPoint;
         }
 
         /// <summary>
         /// Unlocks a particular block to be written.
         /// </summary>
         /// <param name="Address">The address of the subject block.</param>
-        public static void UnlockBlock(ulong Address)
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
+        public static void UnlockBlock(ulong Address, bool Absolute = false)
         {
-            int _oldProtect = 0;
-            VirtualProtectEx(Handle, (IntPtr)Address, 0x100000, 0x40, ref _oldProtect);
-        }
+            var _address = (IntPtr)Address;
 
-        /// <summary>
-        /// Checks if the pointer exists, is valid, and isn't repurposed.
-        /// </summary>
-        /// <param name="Address">The address.</param>
-        /// <returns>TRUE if it is valid, FALSE otherwise.</returns>
-        public static bool IsValidPointer(this ulong Address)
-        {
-            var _readValue = Read<ulong>(Address);
-            if (_readValue == 0x00 || _readValue == 0xEFACCAFE || _readValue == 0xCAFEEFAC || _readValue == 0xFFFFFFFF)
-                return false;
-            else
-                return true;
+            if (Absolute)
+                _address = (IntPtr)(PureAddress + Address);
+
+            int _oldProtect = 0;
+            VirtualProtectEx(Handle, _address, 0x100000, 0x40, ref _oldProtect);
         }
     }
 }
