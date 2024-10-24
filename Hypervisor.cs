@@ -280,7 +280,7 @@ namespace Hypervisor
         }
 
         /// <summary>
-        /// Redirects a MOV instruction to another address. Given it's expects a relative pointer.
+        /// Redirects a MOV instruction to another address. Given it expects a relative pointer.
         /// </summary>
         /// <param name="Address">The instruction address.</param>
         /// <param name="Destination">The address in memory it will be reditected to.</param>
