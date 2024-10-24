@@ -271,10 +271,7 @@ namespace Hypervisor
                 return _returnPoint;
 
             for (int i = 0; i < Offsets.Length - 1; i++)
-            {
                 _returnPoint = Read<uint>(_returnPoint + Offsets[i], true);
-                Console.WriteLine("DEBUG -- POINTER READING: " + _returnPoint.ToString("X8") + " OFFSET: " + Offsets[i].ToString("X8"));
-            }
 
             return _returnPoint + Offsets.Last();
         }
