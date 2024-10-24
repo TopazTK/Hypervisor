@@ -244,12 +244,7 @@ namespace Hypervisor
         /// <returns>The final calculated pointer.</returns>
         public static ulong GetPointer64(ulong Address, uint[] Offsets = null, bool Absolute = false)
         {
-            var _address = (IntPtr)Address;
-
-            if (!Absolute)
-                _address = (IntPtr)(PureAddress + Address);
-
-            var _returnPoint = Read<ulong>((ulong)_address, Absolute);
+            var _returnPoint = Read<ulong>(Address, Absolute);
 
             if (Offsets == null)
                 return _returnPoint;
@@ -270,12 +265,7 @@ namespace Hypervisor
         /// <returns>The final calculated pointer.</returns>
         public static uint GetPointer32(ulong Address, uint[] Offsets = null, bool Absolute = false)
         {
-            var _address = (IntPtr)Address;
-
-            if (!Absolute)
-                _address = (IntPtr)(PureAddress + Address);
-
-            var _returnPoint = Read<uint>((ulong)_address, Absolute);
+            var _returnPoint = Read<uint>(Address, Absolute);
 
             if (Offsets == null)
                 return _returnPoint;
@@ -283,12 +273,77 @@ namespace Hypervisor
             for (int i = 0; i < Offsets.Length - 1; i++)
             {
                 _returnPoint = Read<uint>(_returnPoint + Offsets[i], true);
-                Console.WriteLine("DEBUG -- POINTER READING: " + _returnPoint + " OFFSET: " + Offsets[i]);
+                Console.WriteLine("DEBUG -- POINTER READING: " + _returnPoint.ToString("X8") + " OFFSET: " + Offsets[i].ToString("X8"));
             }
 
             return _returnPoint + Offsets.Last();
         }
-        
+
+        /// <summary>
+        /// Redirects a MOV instruction to another address. Given it's expects a relative pointer.
+        /// </summary>
+        /// <param name="Address">The instruction address.</param>
+        /// <param name="Destination">The address in memory it will be reditected to.</param>
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
+        public static void RedirectInstruction(ulong Address, uint Destination, bool Absolute = false)
+        {
+            var _instEnding = (uint)Address + 0x07;
+            var _instMath = Destination - _instEnding;
+            Write(Address + 0x03, BitConverter.GetBytes(_instMath), Absolute);
+        }
+
+        /// <summary>
+        /// NOPs an instruction, given it's length.
+        /// </summary>
+        /// <param name="Address">The instruction address.</param>
+        /// <param name="Absolute">If the address is absolute, false by default.</param>
+        public static void DeleteInstruction(ulong Address, int Length, bool Absolute = false) => Write(Address, Enumerable.Repeat<byte>(0x90, Length).ToArray(), Absolute);
+
+        /// <summary>
+        /// Finds a signature in memory. Uses the string signature pattern.
+        /// Refuses to return more than one result.
+        /// </summary>
+        /// <param name="Input">The signature to find.</param>
+        /// <returns>The address of said signature.</returns>
+        /// <exception cref="InvalidDataException">The pattern hit more or less than 1 result.</exception>
+        public static IntPtr FindSignature(string Input)
+        {
+            if (_patternBuffer == null)
+                _patternBuffer = Read<byte>(0x00, Process.MainModule.ModuleMemorySize);
+
+            var _sigBytes = Input.Split(' ');
+            int[] _sigList = new int[_sigBytes.Length];
+
+            for (int i = 0; i < _sigList.Length; i++)
+            {
+                if (_sigBytes[i] == "??")
+                    _sigList[i] = -1;
+                else
+                    _sigList[i] = int.Parse(_sigBytes[i], NumberStyles.HexNumber);
+            }
+
+            var results = new List<IntPtr>();
+
+            for (int a = 0; a < _patternBuffer.Length; a++)
+            {
+                for (int b = 0; b < _sigList.Length; b++)
+                {
+                    if (_sigList[b] != -1 && _sigList[b] != _patternBuffer[a + b])
+                        break;
+                    if (b + 1 == _sigList.Length)
+                    {
+                        var result = new IntPtr(a);
+                        results.Add(result);
+                    }
+                }
+            }
+
+            if (results.Count != 1)
+                throw new InvalidDataException("ERROR: Signature scan error -- Either none or more than one found!");
+
+            return results[0];
+        }
+
         /// <summary>
         /// Unlocks a particular block to be written.
         /// </summary>
